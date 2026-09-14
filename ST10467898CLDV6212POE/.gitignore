@@ -1,0 +1,21 @@
+﻿# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Visual Studio Code
+.vscode/
+
+# Azure Functions local settings
+local.settings.json
+
+# Test results
+TestResults/
+
+# Operating system files
+.DS_Store
+Thumbs.db
