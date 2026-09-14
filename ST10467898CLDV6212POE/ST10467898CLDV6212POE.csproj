@@ -11,7 +11,7 @@
 	<ItemGroup>
 
 		<!-- Azure Table Storage -->
-		<PackageReference Include="Azure.Data.Tables" Version="12.11.0" />
+		<PackageReference Include="Azure.Data.Tables" Version="12.12.0" />
 
 		<!-- Azure File Share Storage -->
 		<PackageReference Include="Azure.Storage.Files.Shares" Version="12.27.1" />
@@ -33,6 +33,7 @@
 
 		<!-- Azure Storage Functions -->
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Storage" Version="6.8.1" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 
 	</ItemGroup>
 
