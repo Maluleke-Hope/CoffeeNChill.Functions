@@ -1,5 +1,4 @@
 ﻿using Azure.Data.Tables;
-using Azure.Storage.Files.Shares;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,10 +22,6 @@ public class Program
                 // Register the Azure Table Storage client.
                 services.AddSingleton(
                     new TableServiceClient(connectionString));
-
-                // Register the Azure File Share client.
-                services.AddSingleton(
-                    new ShareServiceClient(connectionString));
             })
             .Build();
 
