@@ -1,34 +1,29 @@
-﻿
-using Azure.Data.Tables;
+﻿using Azure.Data.Tables;
 using Azure.Storage.Queues;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace ST10467898CLDV6212POE;
-
-public class Program
+namespace ST10467898CLDV6212POE
 {
-    public static void Main(string[] args)
+    public class Program
     {
-        var host = new HostBuilder()
-            .ConfigureFunctionsWebApplication()
-            .ConfigureServices((context, services) =>
-            {
-                string connectionString =
-                    context.Configuration["AzureWebJobsStorage"]
-                    ?? throw new InvalidOperationException(
-                        "AzureWebJobsStorage is not configured.");
+        public static void Main(string[] args)
+        {
+            var host = new HostBuilder()
+                .ConfigureFunctionsWorkerDefaults()
+                .ConfigureServices((context, services) =>
+                {
+                    string connectionString =
+                        context.Configuration["AzureWebJobsStorage"]
+                        ?? throw new InvalidOperationException(
+                            "AzureWebJobsStorage is not configured.");
 
-                // Part 1: Azure Table Storage
-                services.AddSingleton(
-                    new TableServiceClient(connectionString));
+                    services.AddSingleton(new TableServiceClient(connectionString));
+                    services.AddSingleton(new QueueServiceClient(connectionString));
+                })
+                .Build();
 
-                // Part 2: Azure Queue Storage
-                services.AddSingleton(
-                    new QueueServiceClient(connectionString));
-            })
-            .Build();
-
-        host.Run();
+            host.Run();
+        }
     }
 }
