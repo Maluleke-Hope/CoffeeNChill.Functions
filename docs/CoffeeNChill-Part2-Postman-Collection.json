@@ -1,0 +1,432 @@
+{
+  "info": {
+    "_postman_id": "393a871e-8fb4-4e22-8129-bac6c7ec7738",
+    "name": "CoffeeNChill - Part 2 API Tests",
+    "description": "### Welcome to Postman! This is your first collection. \n\nCollections are your starting point for building and testing APIs. You can use this one to:\n\n• Group related requests\n• Test your API in real-world scenarios\n• Document and share your requests\n\nUpdate the name and overview whenever you’re ready to make it yours.\n\n[Learn more about Postman Collections.](https://learning.postman.com/docs/collections/collections-overview/)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "57931558",
+    "_collection_link": "https://go.postman.co/collection/57931558-393a871e-8fb4-4e22-8129-bac6c7ec7738?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Get data",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "\npm.test(\"Order successfully queued - HTTP 202\", function () {\n    pm.response.to.have.status(202);\n});\n\npm.test(\"Response contains valid order ID\", function () {\n    const response = pm.response.json();\n    pm.expect(response.orderId).to.be.a(\"string\").and.not.empty;\n});\n\npm.test(\"Order status is Received\", function () {\n    const response = pm.response.json();\n    pm.expect(response.status).to.eql(\"Received\");\n});\n\npm.test(\"Customer ID matches request\", function () {\n    const response = pm.response.json();\n    pm.expect(response.customerId).to.eql(\"CUST-001\");\n});\n\npm.test(\"Response contains a timestamp\", function () {\n    const response = pm.response.json();\n    pm.expect(response.timestamp).to.be.a(\"string\");\n});\n"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "\r\n{\r\n  \"customerId\": \"CUST-001\",\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 2\r\n    }\r\n  ]\r\n}\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/queue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "queue"
+          ]
+        },
+        "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+      },
+      "response": [
+        {
+          "name": "Get data",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "\r\n{\r\n  \"customerId\": \"CUST-001\",\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 2\r\n    }\r\n  ]\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:7071/api/orders/queue",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "7071",
+              "path": [
+                "api",
+                "orders",
+                "queue"
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "content-type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "date",
+              "value": "Sun, 11 Oct 2026 21:04:02 GMT"
+            },
+            {
+              "key": "server",
+              "value": "Kestrel"
+            },
+            {
+              "key": "transfer-encoding",
+              "value": "chunked"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"orderId\": \"88f131b6-30c2-4536-9e71-87dcdb495e8f\",\n  \"customerId\": \"CUST-001\",\n  \"items\": [\n    {\n      \"sku\": \"COF-001\",\n      \"quantity\": 2\n    }\n  ],\n  \"timestamp\": \"2026-10-11T21:04:02.6289537+00:00\",\n  \"status\": \"Received\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Queue Order - Invalid Quantity",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "\npm.test(\"Zero quantity returns HTTP 400\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"Invalid quantity produces validation error\", function () {\n    const response = pm.response.json();\n    pm.expect(response.error).to.be.a(\"string\").and.not.empty;\n});\n"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "\r\n{\r\n  \"customerId\": \"CUST-001\",\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 0\r\n    }\r\n  ]\r\n}\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/queue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "queue"
+          ]
+        },
+        "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+      },
+      "response": [
+        {
+          "name": "Get data",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "\r\n{\r\n  \"customerId\": \"CUST-001\",\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 2\r\n    }\r\n  ]\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:7071/api/orders/queue",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "7071",
+              "path": [
+                "api",
+                "orders",
+                "queue"
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "content-type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "date",
+              "value": "Sun, 11 Oct 2026 21:04:02 GMT"
+            },
+            {
+              "key": "server",
+              "value": "Kestrel"
+            },
+            {
+              "key": "transfer-encoding",
+              "value": "chunked"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"orderId\": \"88f131b6-30c2-4536-9e71-87dcdb495e8f\",\n  \"customerId\": \"CUST-001\",\n  \"items\": [\n    {\n      \"sku\": \"COF-001\",\n      \"quantity\": 2\n    }\n  ],\n  \"timestamp\": \"2026-10-11T21:04:02.6289537+00:00\",\n  \"status\": \"Received\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Queue Order - Missing Customer ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "\npm.test(\"Missing customer ID returns HTTP 400\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"Response contains validation error\", function () {\n    const response = pm.response.json();\n    pm.expect(response.error).to.be.a(\"string\").and.not.empty;\n});\n"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "\r\n{\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 2\r\n    }\r\n  ]\r\n}\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/queue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "queue"
+          ]
+        },
+        "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+      },
+      "response": [
+        {
+          "name": "Get data",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "\r\n{\r\n  \"customerId\": \"CUST-001\",\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 2\r\n    }\r\n  ]\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:7071/api/orders/queue",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "7071",
+              "path": [
+                "api",
+                "orders",
+                "queue"
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "content-type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "date",
+              "value": "Sun, 11 Oct 2026 21:04:02 GMT"
+            },
+            {
+              "key": "server",
+              "value": "Kestrel"
+            },
+            {
+              "key": "transfer-encoding",
+              "value": "chunked"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"orderId\": \"88f131b6-30c2-4536-9e71-87dcdb495e8f\",\n  \"customerId\": \"CUST-001\",\n  \"items\": [\n    {\n      \"sku\": \"COF-001\",\n      \"quantity\": 2\n    }\n  ],\n  \"timestamp\": \"2026-10-11T21:04:02.6289537+00:00\",\n  \"status\": \"Received\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Queue Order - Invalid JSON",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "\npm.test(\"Invalid JSON returns HTTP 400\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"Response contains an error message\", function () {\n    const response = pm.response.json();\n    pm.expect(response.error).to.be.a(\"string\").and.not.empty;\n});\n"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "\r\n{\r\n  \"customerId\": \"CUST-001\",\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 2\r\n    }\r\n",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/orders/queue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "queue"
+          ]
+        },
+        "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+      },
+      "response": [
+        {
+          "name": "Get data",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "\r\n{\r\n  \"customerId\": \"CUST-001\",\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"COF-001\",\r\n      \"quantity\": 2\r\n    }\r\n  ]\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:7071/api/orders/queue",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "7071",
+              "path": [
+                "api",
+                "orders",
+                "queue"
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "content-type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "date",
+              "value": "Sun, 11 Oct 2026 21:04:02 GMT"
+            },
+            {
+              "key": "server",
+              "value": "Kestrel"
+            },
+            {
+              "key": "transfer-encoding",
+              "value": "chunked"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"orderId\": \"88f131b6-30c2-4536-9e71-87dcdb495e8f\",\n  \"customerId\": \"CUST-001\",\n  \"items\": [\n    {\n      \"sku\": \"COF-001\",\n      \"quantity\": 2\n    }\n  ],\n  \"timestamp\": \"2026-10-11T21:04:02.6289537+00:00\",\n  \"status\": \"Received\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Post data",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Successful POST request\", function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              ""
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n\t\"name\": \"Add your name in the body\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "postman-echo.com/post",
+          "host": [
+            "postman-echo",
+            "com"
+          ],
+          "path": [
+            "post"
+          ]
+        },
+        "description": "This is a POST request, submitting data to an API via the request body. This request submits JSON data, and the data is reflected in the response.\n\nA successful POST request typically returns a `200 OK` or `201 Created` response code."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": ""
+    }
+  ]
+}
