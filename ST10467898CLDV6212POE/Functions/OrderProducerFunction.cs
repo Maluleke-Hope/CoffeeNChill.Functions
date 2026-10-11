@@ -1,5 +1,6 @@
 ﻿
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using Azure.Storage.Queues;
 using Microsoft.Azure.Functions.Worker;
@@ -33,6 +34,7 @@ public class OrderProducerFunction
     {
         CreateOrderRequest? order;
 
+        // STEP 1: Read and validate JSON
         try
         {
             order = await JsonSerializer.DeserializeAsync<CreateOrderRequest>(
@@ -50,56 +52,78 @@ public class OrderProducerFunction
                 "Invalid JSON format.");
         }
 
+        // STEP 2: Validate customer name
         if (order == null ||
-            string.IsNullOrWhiteSpace(order.CustomerId) ||
-            order.Items == null ||
-            order.Items.Count == 0 ||
-            order.Items.Any(item =>
-                string.IsNullOrWhiteSpace(item.Sku) ||
-                item.Quantity <= 0))
+            string.IsNullOrWhiteSpace(order.CustomerName))
         {
             return await WriteError(
                 req,
                 HttpStatusCode.BadRequest,
-                "A customerId and at least one valid item are required.");
+                "CustomerName is required.");
         }
 
+        // STEP 3: Validate selected menu items
+        if (order.SelectedItemSKUs == null ||
+            order.SelectedItemSKUs.Count == 0 ||
+            order.SelectedItemSKUs.Any(
+                sku => string.IsNullOrWhiteSpace(sku)))
+        {
+            return await WriteError(
+                req,
+                HttpStatusCode.BadRequest,
+                "At least one valid menu item SKU is required.");
+        }
+
+        // STEP 4: Validate total price
+        if (order.TotalPrice <= 0)
+        {
+            return await WriteError(
+                req,
+                HttpStatusCode.BadRequest,
+                "TotalPrice must be greater than zero.");
+        }
+
+        // STEP 5: Generate order information
         var message = new
         {
-            orderId = Guid.NewGuid().ToString(),
-            customerId = order.CustomerId.Trim(),
-            items = order.Items.Select(item => new
-            {
-                sku = item.Sku!.Trim(),
-                quantity = item.Quantity
-            }).ToList(),
-            timestamp = DateTimeOffset.UtcNow,
-            status = "Received"
+            OrderId = Guid.NewGuid().ToString(),
+            CustomerName = order.CustomerName.Trim(),
+            SelectedItemSKUs = order.SelectedItemSKUs
+                .Select(sku => sku.Trim())
+                .ToList(),
+            TotalPrice = order.TotalPrice,
+            OrderTimestamp = DateTimeOffset.UtcNow
         };
 
+        // STEP 6: Send the order to Azure Queue Storage
         try
         {
             await _queueClient.CreateIfNotExistsAsync();
 
             string messageJson = JsonSerializer.Serialize(message);
 
-            // Encode the JSON for Azure Queue Storage.
+            // Base64 encoding for the Azure Queue trigger
             string encodedMessage = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes(messageJson));
+                Encoding.UTF8.GetBytes(messageJson));
 
             await _queueClient.SendMessageAsync(encodedMessage);
 
             _logger.LogInformation(
-                "Order {OrderId} queued successfully.",
-                message.orderId);
+                "Order {OrderId} queued successfully for {CustomerName}.",
+                message.OrderId,
+                message.CustomerName);
 
+            // STEP 7: Return HTTP 202 Accepted
             var response = req.CreateResponse(HttpStatusCode.Accepted);
             await response.WriteAsJsonAsync(message);
+
             return response;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to queue order.");
+            _logger.LogError(
+                ex,
+                "Failed to send order to Azure Queue Storage.");
 
             return await WriteError(
                 req,
@@ -114,19 +138,22 @@ public class OrderProducerFunction
         string message)
     {
         var response = req.CreateResponse(status);
-        await response.WriteAsJsonAsync(new { error = message });
+
+        await response.WriteAsJsonAsync(new
+        {
+            error = message
+        });
+
         return response;
     }
 }
 
+// Order data received from Postman
 public class CreateOrderRequest
 {
-    public string? CustomerId { get; set; }
-    public List<OrderItemRequest>? Items { get; set; }
-}
+    public string? CustomerName { get; set; }
 
-public class OrderItemRequest
-{
-    public string? Sku { get; set; }
-    public int Quantity { get; set; }
+    public List<string>? SelectedItemSKUs { get; set; }
+
+    public decimal TotalPrice { get; set; }
 }
