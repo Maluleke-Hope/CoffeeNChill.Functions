@@ -1,5 +1,6 @@
-﻿using Azure.Data.Tables;
-using Microsoft.Azure.Functions.Worker;
+﻿
+using Azure.Data.Tables;
+using Azure.Storage.Queues;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -13,15 +14,18 @@ public class Program
             .ConfigureFunctionsWebApplication()
             .ConfigureServices((context, services) =>
             {
-                // Read the Azure Storage connection string from configuration.
                 string connectionString =
                     context.Configuration["AzureWebJobsStorage"]
                     ?? throw new InvalidOperationException(
                         "AzureWebJobsStorage is not configured.");
 
-                // Register the Azure Table Storage client.
+                // Part 1: Azure Table Storage
                 services.AddSingleton(
                     new TableServiceClient(connectionString));
+
+                // Part 2: Azure Queue Storage
+                services.AddSingleton(
+                    new QueueServiceClient(connectionString));
             })
             .Build();
 
