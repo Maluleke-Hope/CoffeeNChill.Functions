@@ -392,4 +392,19 @@ The final unlisted YouTube link will be added here before submission.
 | Full end-to-end testing | Pending |
 | Part 2 demonstration video | Pending |
 
+## How It Works (Architecture Overview)
+
+This system uses a reliable, asynchronous background setup to handle customer orders:
+1. **Taking Orders (HTTP Producer):** When a customer submits an order through our API endpoint (`/api/orders/queue`), the system receives the request and immediately places the order details into an Azure Storage Queue. This keeps the checkout fast and responsive for the customer.
+2. **Processing Orders (Background Worker):** A background processor (`ProcessOrderQueue`) constantly watches the queue. As soon as a new order message appears, it picks it up, processes the details, and securely saves the final order record into Azure Table Storage for tracking and fulfillment.
+
+## Running the Project Locally
+
+To run and test this entire system locally on your computer:
+
+1. **Prerequisites:** Make sure you have **Docker Desktop** installed and running on your machine.
+2. **Start the Environment:** Navigate to the project root folder in your terminal and run Docker Compose to spin up the Azurite storage emulator and the Functions app together:
+   ```bash
+   docker-compose up --build
+
 This README will be updated as the remaining group functionality is completed and verified.
