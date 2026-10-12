@@ -1,41 +1,42 @@
 # CoffeeNChill - Azure Functions & Azurite Containerized API
 
-## Project Overview
+## 1. Project Overview
 
 CoffeeNChill is a Canteen Management System developed using C#, .NET 8, Azure Functions and Azure Storage.
 
-The system helps manage menu items, staff documents and customer orders.
+The application manages menu items, staff documents and customer orders using cloud-based storage services and serverless functions.
 
 The project is divided into three parts:
 
 - **Part 1:** Azure Functions, Azure Table Storage, staff document management and Docker.
-- **Part 2:** Azure Queue Storage, asynchronous order processing and Docker Compose.
-- **Part 3:** ASP.NET Core Web API Gateway, JWT authentication and live deployment.
+- **Part 2:** Azure Queue Storage, asynchronous order processing, order status management and Docker Compose.
+- **Part 3:** ASP.NET Core Web API Gateway, JWT authentication and deployment.
 
-The application uses Azurite to emulate Azure Tables, Blobs and Queues locally.
+The application uses Azurite to emulate Azure Table, Blob and Queue Storage locally.
 
-## Technologies Used
+## 2. Technologies Used
 
 - C# and .NET 8
-- Azure Functions v4 (Isolated Worker)
+- Azure Functions v4 (.NET Isolated Worker)
 - Azure Table Storage
 - Azure Queue Storage
 - Azure Storage Files SDK
 - Azurite Storage Emulator
 - Docker Desktop
+- Docker Compose
 - Docker Hub
 - Visual Studio
 - Postman
 - Microsoft Azure Storage Explorer
 - Git and GitHub
 
-## Part 1: Menu Management and Staff Documents
+## 3. Part 1: Menu Management and Staff Documents
 
-### Menu Management
+### 3.1 Menu Management
 
 The application uses Azure Table Storage to manage menu items through HTTP-triggered Azure Functions.
 
-Implemented endpoints:
+The following endpoints have been implemented:
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -46,140 +47,89 @@ Implemented endpoints:
 | PUT | `/api/menu/{category}/{sku}` | Update a menu item |
 | DELETE | `/api/menu/{category}/{sku}` | Delete a menu item |
 
-The duplicated Menu Functions identified during Part 1 assessment were removed.
+During Part 2 improvements, duplicated Menu Function registrations were removed to prevent conflicting Azure Function endpoints.
 
-### Staff Document Management
+### 3.2 Staff Document Management
 
-The project contains Azure File Share functionality for staff documents, including upload and retrieval methods.
+The project contains Azure File Share functionality for uploading and retrieving staff documents.
 
-The registered routes include:
+The registered endpoints include:
 
 - `POST /api/staff-documents`
 - `GET /api/staff-documents/{staffName}/{fileName}`
 
-The existing functionality requires further integration verification because Azure File Shares are not supported by the local Azurite emulator.
+The Staff Document functionality requires further integration verification because Azure File Shares are not supported by the Azurite emulator.
 
-### Part 1 Improvements
+### 3.3 Part 1 Docker Hub Images
 
-Following lecturer feedback, the following improvement was completed:
-
-- Removed duplicated Menu Functions to prevent conflicting function registrations.
-
-Additional improvements to Staff Document integration remain under review.
-
-## Docker Hub Images
-
-The Part 1 project references the following Docker Hub images:
+The original Part 1 Docker Hub images were:
 
 - Azure Functions API: `malulekehope/coffeenchill-functions:v1.0`
 - Azurite Storage: `malulekehope/coffeenchill-azurite:v1.0`
 
-These image references are retained from Part 1 documentation. Docker Hub publishing and execution must be verified again for the final Part 2 demonstration.
+These references are retained for documentation of the original Part 1 implementation.
 
-## Running the Application Locally
+## 4. Part 2: Azure Queue Storage and Asynchronous Order Processing
 
-### 1. Start Azurite
+### 4.1 Overview
 
-Start Docker Desktop and run the existing Azurite container.
+Part 2 introduces asynchronous customer order processing through Azure Queue Storage.
 
-Example command for an existing container:
+Instead of completing order processing within the initial HTTP request, the application queues the order and allows a background Azure Function to process it.
 
-```powershell
-docker start coffeenchill-azurite
-```
+This separates order submission from background processing.
 
-Alternatively, a new standard Azurite container can be created with:
-
-```powershell
-docker run -d --name coffeenchill-azurite -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-storage/azurite
-```
-
-Do not create another container if one with the same name already exists.
-
-### 2. Configure Local Settings
-
-The local `local.settings.json` file uses the following configuration:
-
-```json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "FUNCTIONS_WORKER_RUNTIME_VERSION": "8.0"
-  }
-}
-```
-
-This file is excluded from Git tracking to prevent local settings and possible credentials from being committed.
-
-### 3. Start Azure Functions
-
-Open the solution in Visual Studio.
-
-Select:
-
-**Debug → Start Debugging**
-
-The application runs locally using the Azure Functions host.
-
-The order endpoint is available at:
-
-`http://localhost:7071/api/orders/queue`
-
-## Part 2: Azure Queue Storage and Asynchronous Orders
-
-### Overview
-
-Part 2 introduces asynchronous order processing to the CoffeeNChill system.
-
-Instead of processing a customer order entirely during an HTTP request, the application places an order message into Azure Queue Storage.
-
-A queue-triggered Azure Function is responsible for retrieving and processing the messages.
-
-### Order Processing Architecture
-
-The intended workflow is:
-
-1. A customer submits an order using HTTP POST.
-2. The Order Producer validates the request.
-3. The producer generates a unique order ID and timestamp.
-4. The order is sent to Azure Queue Storage.
-5. The queue-triggered function processes the message.
-6. The order is recorded in Azure Table Storage.
-7. The order progresses through its preparation statuses.
-
-The queue is named:
+The application uses the queue:
 
 `order-processing-queue`
 
-### Order Producer
+### 4.2 Order Processing Architecture
+
+The complete order-processing workflow is:
+
+1. A customer submits an order through an HTTP POST request.
+2. The Order Producer validates the submitted JSON.
+3. A unique OrderId and UTC OrderTimestamp are generated.
+4. The order is serialized and sent to Azure Queue Storage.
+5. The queue-triggered processor automatically detects the message.
+6. The processor validates and saves the order into Azure Table Storage.
+7. The order is recorded with the initial Received status.
+8. The processor changes the status to Preparing.
+9. The Order Status Update Function allows the status to advance to Ready.
+10. A subsequent valid request advances the order to Collected.
+11. Azure Table Storage maintains the current order information and status history.
+
+The complete lifecycle is:
+
+**Received → Preparing → Ready → Collected**
+
+## 5. HTTP Order Producer
+
+### 5.1 Function Details
 
 **Function name:** `QueueOrder`
 
-**Method:** POST
+**File:** `Functions/OrderProducerFunction.cs`
+
+**HTTP method:** POST
 
 **Endpoint:** `/api/orders/queue`
 
-The Order Producer is implemented in:
+The Order Producer is responsible for:
 
-`Functions/OrderProducerFunction.cs`
+- Receiving JSON order requests.
+- Validating customer information.
+- Verifying selected menu item SKUs.
+- Rejecting empty item lists and invalid total prices.
+- Generating a unique OrderId using a GUID.
+- Generating a UTC OrderTimestamp.
+- Serializing the order into JSON.
+- Sending the order to Azure Queue Storage.
+- Returning HTTP 202 Accepted after successful queue placement.
+- Returning HTTP 400 Bad Request for invalid input.
+- Logging processing errors.
 
-The producer:
-
-- Accepts JSON order requests.
-- Validates customer names.
-- Validates selected menu item SKUs.
-- Rejects invalid total prices.
-- Generates a unique OrderId using a GUID.
-- Generates a UTC OrderTimestamp.
-- Serializes the order into JSON.
-- Sends the message to Azure Queue Storage using Base64 encoding.
-- Returns HTTP 202 Accepted when the message is queued successfully.
-- Returns HTTP 400 Bad Request for invalid order information.
-- Logs queue submission failures.
-
-### Example Order Request
+### 5.2 Example Order Request
 
 ```json
 {
@@ -192,219 +142,586 @@ The producer:
 }
 ```
 
-### Order Message Structure
+### 5.3 Order Message Structure
 
-The Azure Storage Queue message contains:
+The order message contains five required fields:
 
 | Field | Description |
 |---|---|
-| OrderId | Unique GUID identifying the order |
-| CustomerName | Customer placing the order |
-| SelectedItemSKUs | Selected menu item codes |
+| OrderId | Unique GUID generated for each order |
+| CustomerName | Name of the customer |
+| SelectedItemSKUs | List of selected menu item codes |
 | TotalPrice | Total cost of the order |
-| OrderTimestamp | UTC timestamp of order creation |
+| OrderTimestamp | UTC date and time of order creation |
 
-### Queue Storage Configuration
+Azure Queue Storage is used to store the message until the background processor retrieves it.
+
+### 5.4 Azure Queue Storage Configuration
 
 The application registers `QueueServiceClient` in `Program.cs` using the `AzureWebJobsStorage` connection string.
 
-Azurite emulates Azure Queue Storage locally.
+During local Visual Studio testing, the storage connection is configured using:
 
-The queue uses the endpoint:
+`UseDevelopmentStorage=true`
+
+Azurite provides local Azure Queue Storage functionality.
+
+The local queue endpoint is:
 
 `http://127.0.0.1:10001/devstoreaccount1/order-processing-queue`
 
 The Order Producer creates the queue if it does not already exist.
 
-### Order Producer Testing
+## 6. Queue-Triggered Order Processor
 
-The Order Producer was tested using Postman.
+### 6.1 Function Details
 
-The following scenarios were covered:
+**Function name:** `ProcessOrderQueue`
 
-| Test | Expected Status |
+**File:** `Functions/ProcessOrderQueue.cs`
+
+**Trigger:** Azure Storage Queue Trigger
+
+**Queue:** `order-processing-queue`
+
+**Status:** Implemented and successfully tested locally.
+
+The processor automatically executes when an order message becomes available in Azure Queue Storage.
+
+### 6.2 Processing Responsibilities
+
+The processor performs the following operations:
+
+1. Receives the queued message.
+2. Deserializes the JSON message into the OrderQueueMessage model.
+3. Validates the order ID, customer name, selected SKUs, price and timestamp.
+4. Connects to the Orders Azure Table.
+5. Creates the table if it does not exist.
+6. Uses the UTC order date as the PartitionKey.
+7. Uses OrderId as the RowKey.
+8. Stores the customer's name, selected items, price and timestamp.
+9. Records the Received status.
+10. Updates the order to Preparing.
+11. Logs successful processing and errors.
+
+### 6.3 Azure Orders Table Structure
+
+The Orders Table stores the following information:
+
+| Property | Description |
 |---|---|
-| Valid order | 202 Accepted |
+| PartitionKey | UTC order date in yyyy-MM-dd format |
+| RowKey | Unique OrderId |
+| CustomerName | Customer's name |
+| ItemsJson | Selected item SKUs serialized as JSON |
+| TotalPrice | Total price of the order |
+| OrderTimestamp | Original UTC order creation timestamp |
+| Status | Current order status |
+| StatusHistory | Recorded status progression |
+| Timestamp | Azure Table Storage system metadata |
+| ETag | Azure Table Storage concurrency metadata |
+
+### 6.4 Queue Processor Testing
+
+Local integration testing was performed using Visual Studio, Postman, Azurite and Microsoft Azure Storage Explorer.
+
+Testing confirmed that:
+
+- The HTTP Order Producer successfully queued an order.
+- The queue-triggered processor detected the new message.
+- The processor successfully deserialized the order.
+- A new entity was created in the Orders Azure Table.
+- The correct date-based PartitionKey was stored.
+- The RowKey matched the generated order ID.
+- CustomerName and selected items were stored correctly.
+- The order advanced from Received to Preparing.
+
+The Azure Functions console confirmed successful queue-trigger execution without processing errors during the verified test.
+
+## 7. Order Status Management
+
+### 7.1 Update Order Status Function
+
+**Function name:** `UpdateOrderStatus`
+
+**File:** `Functions/UpdateOrderStatusFunction.cs`
+
+**HTTP method:** PUT
+
+**Endpoint:** `/api/orders/{orderDate}/{orderId}/status`
+
+The UpdateOrderStatus Function allows existing orders to advance through their lifecycle.
+
+The function retrieves the order using its date-based PartitionKey and OrderId RowKey.
+
+It validates the requested status before updating the existing Azure Table Storage entity.
+
+### 7.2 Valid Status Transitions
+
+| Current status | Permitted next status |
+|---|---|
+| Received | Preparing, handled by the processor |
+| Preparing | Ready |
+| Ready | Collected |
+| Collected | No further transitions |
+
+The HTTP status-update endpoint handles the Ready and Collected transitions.
+
+Invalid transitions are rejected to preserve the correct order lifecycle.
+
+### 7.3 Example Status Update Request
+
+**Method:** PUT
+
+**Endpoint:**
+
+`/api/orders/2026-10-12/{orderId}/status`
+
+**Request body:**
+
+```json
+{
+  "Status": "Ready"
+}
+```
+
+### 7.4 HTTP Responses
+
+| Scenario | HTTP status |
+|---|---|
+| Successful status update | 200 OK |
+| Invalid order date or ID | 400 Bad Request |
 | Invalid JSON | 400 Bad Request |
-| Missing CustomerName | 400 Bad Request |
-| Invalid TotalPrice | 400 Bad Request |
-| Empty SelectedItemSKUs | 400 Bad Request |
+| Unsupported requested status | 400 Bad Request |
+| Order not found | 404 Not Found |
+| Invalid status transition | 409 Conflict |
+| Concurrent update conflict | 409 Conflict |
 
-The successful order submission passed six automated Postman assertions.
+### 7.5 Status History
 
-The invalid-order scenarios were also tested using automated Postman assertions.
+The application maintains a StatusHistory property for each order.
 
-### Azure Storage Explorer Verification
+A successfully completed order has the following history:
 
-Microsoft Azure Storage Explorer was used to inspect the queue.
+`Received -> Preparing -> Ready -> Collected`
 
-The verification confirmed:
+This makes it possible to verify the order's progression during testing.
 
-- The `order-processing-queue` exists.
-- The producer successfully places messages into Azure Queue Storage.
-- Messages contain the required order fields.
-- The message can be viewed as decoded JSON.
-- The tested message had a dequeue count of zero before processor integration.
+### 7.6 Order Lifecycle Testing
 
-This confirms that the producer can place orders into the queue.
+The complete order lifecycle was successfully tested locally using Postman.
 
-### Postman Collection
+The following results were verified:
 
-The Part 2 Postman collection is stored in the repository's `docs` folder.
+| Test | Expected response | Verified result |
+|---|---|---|
+| Create order | 202 Accepted | Passed |
+| Preparing to Ready | 200 OK | Passed |
+| Ready to Collected | 200 OK | Passed |
+| Collected back to Ready | 409 Conflict | Passed |
 
-Collection filename:
+The final order status was also verified as Collected in Microsoft Azure Storage Explorer.
 
-`CoffeeNChill-Part2-Postman-Collection.json`
+## 8. Postman API Testing
 
-The collection uses the reusable variable:
+### 8.1 Postman Collection
 
-`{{baseUrl}}`
+The final Part 2 Postman collection is stored at:
 
-For local testing:
+`docs/CoffeeNChill-Part2-Final.postman_collection.json`
+
+The collection contains automated tests for:
+
+- Valid order submission.
+- Invalid JSON.
+- Missing customer name.
+- Invalid total price.
+- Empty selected item list.
+- Updating order status to Ready.
+- Updating order status to Collected.
+- Rejecting invalid order status transitions.
+
+### 8.2 Automated Test Results
+
+The successful Order Producer request passed six automated Postman assertions.
+
+The Ready status update was tested successfully using HTTP 200 OK.
+
+The Collected status update was tested successfully using HTTP 200 OK.
+
+The invalid transition test returned the expected HTTP 409 Conflict with three passing Postman assertions.
+
+### 8.3 Reusable Postman Variables
+
+The collection uses the following variables:
+
+| Variable | Description |
+|---|---|
+| baseUrl | Base address of the Azure Functions API |
+| orderId | Generated OrderId from the successful POST response |
+| orderDate | Date extracted from the generated OrderTimestamp |
+
+The successful POST request automatically stores orderId and orderDate using an After response script.
+
+Subsequent status-update requests use:
+
+`{{baseUrl}}/api/orders/{{orderDate}}/{{orderId}}/status`
+
+This allows new orders to be tested without manually entering a new order ID each time.
+
+### 8.4 Recommended Test Execution Order
+
+To test the full lifecycle on a new order, run the requests in the following sequence:
+
+1. Queue Order - Success.
+2. Update Order Status - Ready.
+3. Update Order Status - Collected.
+4. Update Order Status - Invalid Transition.
+
+The queued order must first be processed into the Orders Table before the status-update requests execute.
+
+Because queue processing is asynchronous, a short wait or retry may be necessary before the Ready update.
+
+### 8.5 Postman Base URL Configuration
+
+For local testing through Visual Studio:
 
 `baseUrl = http://localhost:7071`
 
-The collection contains requests for successful order submission and invalid-order scenarios.
+For Docker Compose testing, when mapped to host port 8080:
 
-## Queue-Triggered Order Processor
+`baseUrl = http://localhost:8080`
 
-**Integration status: Pending verification**
+## 9. Azure Storage Explorer Verification
 
-The queue-triggered processor is responsible for:
+Microsoft Azure Storage Explorer was used to inspect the local Azurite storage services.
 
-1. Automatically triggering when a new order enters `order-processing-queue`.
-2. Reading and deserializing the queue message.
-3. Creating an order record in the Azure Orders Table.
-4. Using the order date as PartitionKey.
-5. Using OrderId as RowKey.
-6. Tracking the order through its preparation lifecycle.
-7. Logging processing results and handling errors.
+The verification confirmed:
 
-The required order statuses are:
+- The order-processing-queue was created successfully.
+- Order messages were stored in Azure Queue Storage.
+- The queue message contained the required order fields.
+- The queue-triggered processor retrieved and processed order messages.
+- The Orders Azure Table was created.
+- New orders were saved using the date-based PartitionKey.
+- Customer names and menu item SKUs were correctly stored.
+- Status changes were persisted in Azure Table Storage.
+- The final Collected status was successfully verified.
 
-Received → Preparing → Ready → Collected
+These results demonstrate successful local integration between the HTTP Order Producer, Azure Queue Storage, queue-triggered processor, status-update endpoint and Orders Table.
 
-The producer and processor must use the same JSON field structure and compatible queue message encoding.
+## 10. Local Development Setup
 
-The complete end-to-end workflow will be verified during group integration.
+### 10.1 Prerequisites
 
-## Docker Compose Integration
+To run the project locally, the following software is required:
 
-**Status: Pending group verification**
+- Visual Studio with .NET development support.
+- .NET 8 SDK.
+- Azure Functions Core Tools.
+- Docker Desktop.
+- Postman.
+- Microsoft Azure Storage Explorer.
+- Git.
 
-Part 2 requires a `docker-compose.yml` file to orchestrate the application's containers.
+### 10.2 Start Azurite
 
-The required services are:
+Start Docker Desktop.
 
-- Azurite Storage Emulator
-- CoffeeNChill Azure Functions application
+If an existing Azurite container is available, start it using Docker Desktop or the command:
 
-The final Docker Compose configuration must support:
+```powershell
+docker start coffeenchill-azurite
+```
 
-- Docker Hub image references.
-- Correct container networking.
-- Environment variables.
-- Persistent Azurite storage.
-- Reliable container startup.
-- The `docker-compose up` startup command required by the assignment.
+Alternatively, create a standard Azurite container:
 
-The final configuration and verified startup instructions will be documented after integration.
+```powershell
+docker run -d --name coffeenchill-azurite -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-storage/azurite
+```
 
-## GitHub Version Control
+Do not create a second container with the same name or use the same host ports while another Azurite instance is already running.
 
-GitHub is used to maintain the project source code and record individual contributions.
+### 10.3 Configure Local Settings
 
-Each group member must make at least five meaningful commits per assignment part, using their own Git identity.
+Create or update `local.settings.json` with the following local development configuration:
 
-Git commit history is used to verify development progress and individual participation.
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "FUNCTIONS_WORKER_RUNTIME_VERSION": "8.0"
+  }
+}
+```
 
-## Group Responsibilities
+The local settings file is excluded from Git tracking through `.gitignore`.
 
-### Sothoane-Mamello
+### 10.4 Start Azure Functions
 
-Responsible for:
+Open the project in Visual Studio.
 
-- Removing duplicated Menu Functions.
-- Implementing the HTTP Order Producer.
-- Configuring Azure Queue Storage integration.
-- Implementing order validation and error handling.
-- Creating and running Postman tests.
-- Verifying messages using Azure Storage Explorer.
-- Maintaining Part 2 API testing documentation.
+Select:
 
-### Partner
+**Debug → Start Debugging**
 
-Responsible for:
+The HTTP functions are hosted locally on port 7071.
 
-- Dockerfile development and improvements.
+Examples include:
+
+- `POST http://localhost:7071/api/orders/queue`
+- `PUT http://localhost:7071/api/orders/{orderDate}/{orderId}/status`
+
+The ProcessOrderQueue function runs automatically when an order message arrives in Azure Queue Storage.
+
+## 11. Docker and Docker Compose
+
+### 11.1 Docker Overview
+
+Docker is used to package the application and its dependencies into a container image.
+
+Docker Compose is used to orchestrate the Azure Functions application and the Azurite storage emulator.
+
+### 11.2 Dockerfile
+
+The Dockerfile uses a .NET 8 SDK build stage and an Azure Functions .NET 8 isolated runtime stage.
+
+The build stage restores dependencies and publishes the application.
+
+The runtime stage copies the published files into the Azure Functions container.
+
+### 11.3 Local Docker Image Build
+
+The application was successfully built locally using:
+
+```powershell
+docker build -t coffeenchill-functions:v2.0 .
+```
+
+This confirmed that Docker could build the CoffeeNChill .NET 8 application image.
+
+### 11.4 Docker Compose Configuration
+
+The project includes a Compose configuration file:
+
+`compose.yml`
+
+The Compose deployment is intended to run:
+
+- The Azure Functions application.
+- The Azurite Storage Emulator.
+
+The configuration supplies the storage connection settings and maps the API to host port 8080.
+
+The functions container must use Docker's internal service hostname to connect to Azurite instead of localhost.
+
+### 11.5 Running Docker Compose
+
+From the folder containing `compose.yml`, validate the configuration using:
+
+```powershell
+docker compose -f compose.yml config
+```
+
+Start the containers using:
+
+```powershell
+docker compose -f compose.yml up --build
+```
+
+Check the container status using:
+
+```powershell
+docker compose -f compose.yml ps
+```
+
+For a detached deployment, use:
+
+```powershell
+docker compose -f compose.yml up -d --build
+```
+
+The project's containerized API is configured to be accessed through:
+
+`http://localhost:8080`
+
+The exact Compose configuration, ports and image references must be checked against the final working deployment.
+
+### 11.6 Containerized Integration Status
+
+The project partner reported successfully verifying:
+
+- Docker Compose startup.
+- The Azure Functions application running on port 8080.
+- Azurite Queue and Table Storage connectivity.
+- Successful POST order submission.
+- HTTP 202 Accepted responses.
+- Automatic queue processing.
+- Orders Table persistence.
+
+Final joint verification is still required for the Ready and Collected status-update endpoints through the containerized deployment.
+
+### 11.7 Docker Hub Publishing
+
+The original Part 1 Docker Hub images were published under:
+
+`malulekehope/coffeenchill-functions:v1.0`
+
+and
+
+`malulekehope/coffeenchill-azurite:v1.0`
+
+The final Part 2 application image and published tag must be confirmed with the project partner before submission.
+
+The locally built image `coffeenchill-functions:v2.0` is not, by itself, proof of Docker Hub publication.
+
+## 12. GitHub Version Control
+
+The project uses Git and GitHub for collaborative development and version control.
+
+Each group member is required to contribute at least five meaningful commits per assignment part under their own Git identity.
+
+The repository history records:
+
+- Azure Queue Storage Order Producer implementation.
+- Postman order validation testing.
+- Order Producer schema improvements.
+- Part 2 README documentation.
+- Order lifecycle integration fixes.
+- Final Postman collection and automated lifecycle testing.
+- Partner Docker and repository improvements.
+
+Both group members' contributions are visible through Git history.
+
+## 13. Group Contributions
+
+### 13.1 Sothoane-Mamello
+
+Responsibilities and contributions:
+
+- Removed duplicated Menu Functions.
+- Implemented the HTTP Order Producer.
+- Registered Azure Queue Storage integration.
+- Added JSON validation and error handling.
+- Generated unique order IDs and timestamps.
+- Created and tested Postman requests.
+- Verified queue messages through Azure Storage Explorer.
+- Corrected order message and entity mapping during integration.
+- Implemented the UpdateOrderStatus HTTP Function.
+- Tested the complete order lifecycle.
+- Tested invalid status transitions.
+- Added reusable Postman collection variables.
+- Exported and committed the final Postman testing collection.
+- Updated Part 2 documentation.
+
+### 13.2 Partner
+
+Responsibilities and contributions:
+
+- Dockerfile implementation and maintenance.
 - Docker Compose configuration.
-- Queue-triggered Azure Function.
-- Azure Orders Table integration.
-- Order lifecycle status tracking.
-- Docker Hub publishing.
-- Container orchestration.
+- Azurite container networking.
+- Queue-triggered processor implementation.
+- Orders Azure Table integration.
+- Error handling and logging for background processing.
+- Containerized integration testing.
+- Docker Hub image management and publishing.
+- Repository and deployment documentation.
+- Final demonstration video preparation.
 
-### Shared Responsibilities
+### 13.3 Shared Responsibilities
 
 Both group members are responsible for:
 
-- Integration testing.
-- Maintaining GitHub contributions.
-- Reviewing the README.
-- Testing the complete order workflow.
-- Recording the final demonstration video.
-- Checking deliverables against the marking rubric.
+- Reviewing the integration between the producer and processor.
+- Verifying order message compatibility.
+- Testing the complete order lifecycle.
+- Reviewing Docker deployment results.
+- Maintaining meaningful GitHub contributions.
+- Checking deliverables against the assignment rubric.
+- Providing explanations of their individual work for the final demonstration.
 
-## Part 2 Changelog
+## 14. Part 2 Development Changelog
 
-- Removed duplicate menu function registrations.
-- Registered Azure Queue Storage in `Program.cs`.
-- Created the HTTP-triggered Order Producer.
-- Added unique order identifiers and timestamps.
-- Improved request validation and error handling.
-- Updated the queue message format to match the assignment requirements.
-- Created automated Postman validation tests.
-- Verified queue message placement using Azure Storage Explorer.
-- Added Part 2 documentation.
+The following improvements were completed during Part 2 development:
 
-## Demonstration Video
+1. Removed duplicate Azure Menu Function registrations.
+2. Registered Azure Queue Storage in Program.cs.
+3. Implemented the HTTP Order Producer.
+4. Added validation for customer details, selected menu items and total price.
+5. Generated unique order identifiers and UTC timestamps.
+6. Added asynchronous message placement in Azure Queue Storage.
+7. Updated the queue message model to match the Part 2 specification.
+8. Corrected Orders Table data mapping.
+9. Implemented date-based PartitionKey and OrderId RowKey storage.
+10. Verified queue-triggered processing.
+11. Added Received and Preparing status processing.
+12. Implemented HTTP status updates for Ready and Collected.
+13. Added validation for invalid status transitions.
+14. Implemented order status history tracking.
+15. Tested the complete local order lifecycle.
+16. Added reusable Postman collection variables.
+17. Exported the final automated Postman collection.
+18. Updated technical documentation.
 
-Part 1 video: Available through the group's original submission.
+## 15. Demonstration Video
 
-Part 2 video: Pending recording and upload.
+**Part 1:** Demonstration included in the original group submission.
 
-The final Part 2 demonstration must show the application running through Docker Compose, order submission in Postman, queue processing, order tracking in Azure Table Storage, and an explanation of the implementation and design decisions.
+**Part 2:** Pending final recording and upload.
 
-The final unlisted YouTube link will be added here before submission.
+The final Part 2 demonstration should show:
 
-## Final Verification Status
+1. Starting the application through Docker Compose.
+2. The Azure Functions application and Azurite containers running.
+3. Submitting a new order using Postman.
+4. Receiving HTTP 202 Accepted.
+5. Confirming automatic queue-triggered processing.
+6. Verifying the order in Azure Table Storage.
+7. Updating the order to Ready.
+8. Updating the order to Collected.
+9. Demonstrating invalid status-transition validation.
+10. Explaining the technical implementation and individual contributions.
+
+**Part 2 Video Link:** Pending upload.
+
+The final demonstration video link will be added before submission.
+
+## 16. Final Verification Status
 
 | Component | Status |
 |---|---|
 | Menu HTTP Functions | Implemented |
-| Order Producer | Implemented and tested |
+| Duplicate Menu Function correction | Completed |
+| HTTP Order Producer | Implemented and tested |
 | Order validation | Tested |
-| Azure Queue message placement | Verified |
-| Postman producer tests | Completed |
-| Queue-triggered processor | Awaiting integration |
-| Orders Table status tracking | Awaiting verification |
-| Docker Compose | Awaiting verification |
-| Full end-to-end testing | Pending |
+| Azure Queue Storage message placement | Verified |
+| Queue-triggered processor | Locally verified |
+| Orders Table integration | Locally verified |
+| Date-based PartitionKey | Verified |
+| Customer and selected items persistence | Verified |
+| Preparing → Ready | Verified |
+| Ready → Collected | Verified |
+| Invalid status-transition rejection | Verified |
+| Reusable Postman order variables | Tested |
+| Final Postman collection | Exported and committed |
+| Local Docker image build | Successful |
+| Docker Compose deployment | Partner reports successful |
+| Containerized status lifecycle | Awaiting joint verification |
+| Final Docker Hub publication | Awaiting confirmation |
+| GitHub individual commit requirement | Verified for Order Producer contributor |
 | Part 2 demonstration video | Pending |
 
-## How It Works (Architecture Overview)
+## 17. Conclusion
 
-This system uses a reliable, asynchronous background setup to handle customer orders:
-1. **Taking Orders (HTTP Producer):** When a customer submits an order through our API endpoint (`/api/orders/queue`), the system receives the request and immediately places the order details into an Azure Storage Queue. This keeps the checkout fast and responsive for the customer.
-2. **Processing Orders (Background Worker):** A background processor (`ProcessOrderQueue`) constantly watches the queue. As soon as a new order message appears, it picks it up, processes the details, and securely saves the final order record into Azure Table Storage for tracking and fulfillment.
+CoffeeNChill Part 2 successfully introduces asynchronous order processing using Azure Functions and Azure Storage Queue.
 
-## Running the Project Locally
+Local testing confirms that orders can be submitted, queued, processed, saved in Azure Table Storage and advanced through the required order lifecycle.
 
-To run and test this entire system locally on your computer:
+The application also rejects invalid order requests and invalid status transitions.
 
-1. **Prerequisites:** Make sure you have **Docker Desktop** installed and running on your machine.
-2. **Start the Environment:** Navigate to the project root folder in your terminal and run Docker Compose to spin up the Azurite storage emulator and the Functions app together:
-   ```bash
-   docker-compose up --build
+The final Postman collection provides reusable automated tests for order submission and order management.
 
-This README will be updated as the remaining group functionality is completed and verified.
+The remaining final submission activities include confirming the complete Docker Compose integration, verifying Docker Hub publication, reviewing the partner's deployment results and uploading the demonstration video.
