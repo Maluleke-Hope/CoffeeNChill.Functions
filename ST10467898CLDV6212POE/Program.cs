@@ -1,32 +1,57 @@
-﻿
+﻿using System.Text;
 using Azure.Data.Tables;
-using Azure.Storage.Queues;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using CoffeeNChill.ApiGateway.Models;
+using CoffeeNChill.ApiGateway.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
 
-namespace ST10467898CLDV6212POE;
+var builder = WebApplication.CreateBuilder(args);
 
-public class Program
-{
-    public static void Main(string[] args)
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Storage & Services Dependency Injection
+var storageConn = builder.Configuration.GetConnectionString("AzureStorage")
+                  ?? "UseDevelopmentStorage=true";
+builder.Services.AddSingleton(new TableServiceClient(storageConn));
+builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
+builder.Services.AddScoped<IUserRegistrationService, UserRegistrationService>();
+builder.Services.AddScoped<IUserLoginService, UserLoginService>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+// JWT Authentication Configuration
+var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is missing.");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        var host = new HostBuilder()
-            .ConfigureFunctionsWebApplication()
-            .ConfigureServices((context, services) =>
-            {
-                string connectionString =
-                    context.Configuration["AzureWebJobsStorage"]
-                    ?? throw new InvalidOperationException(
-                        "AzureWebJobsStorage is not configured.");
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
 
-                services.AddSingleton(
-                    new TableServiceClient(connectionString));
+builder.Services.AddAuthorization();
 
-                services.AddSingleton(
-                    new QueueServiceClient(connectionString));
-            })
-            .Build();
+var app = builder.Build();
 
-        host.Run();
-    }
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+app.UseHttpsRedirection();
+app.UseAuthentication(); // Must be before UseAuthorization
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
