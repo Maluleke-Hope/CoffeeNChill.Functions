@@ -1,9 +1,10 @@
 using Azure;
 using Azure.Data.Tables;
-using CoffeeNChill.ApiGateway.Models;
 using Microsoft.AspNetCore.Identity;
+using ST10467898CLDV6212POE.Models;
+using ST10467898CLDV6212POE.DTOs;
 
-namespace CoffeeNChill.ApiGateway.Services;
+namespace ST10467898CLDV6212POE.Services;
 
 public interface IUserRegistrationService
 {
@@ -36,6 +37,7 @@ public class UserRegistrationService : IUserRegistrationService
 
         var indexEntity = new UserEmailIndexEntity
         {
+            PartitionKey = "EMAIL",
             RowKey = email,
             UserPartitionKey = "Customer",
             UserRowKey = email

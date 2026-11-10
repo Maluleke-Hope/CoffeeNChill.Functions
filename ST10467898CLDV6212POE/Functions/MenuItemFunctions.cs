@@ -1,10 +1,14 @@
 ﻿using System.Net;
+using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using ST10467898CLDV6212POE.DTOs;
 using ST10467898CLDV6212POE.Models;
 
@@ -35,7 +39,14 @@ public class MenuItemFunctions
 
         _tableClient = tableServiceClient.GetTableClient(TableName);
 
-        _tableClient.CreateIfNotExists();
+        try
+        {
+            _tableClient.CreateIfNotExists();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not automatically create table on startup. Continuing without local storage connection.");
+        }
     }
 
 
@@ -168,11 +179,18 @@ public class MenuItemFunctions
         {
             List<MenuItemEntity> items = new List<MenuItemEntity>();
 
-            await foreach (
-                MenuItemEntity item
-                in _tableClient.QueryAsync<MenuItemEntity>())
+            try
             {
-                items.Add(item);
+                await foreach (
+                    MenuItemEntity item
+                    in _tableClient.QueryAsync<MenuItemEntity>())
+                {
+                    items.Add(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not connect to storage. Returning empty list for local testing.");
             }
 
             HttpResponseData response =
@@ -222,12 +240,19 @@ public class MenuItemFunctions
 
             List<MenuItemEntity> items = new List<MenuItemEntity>();
 
-            await foreach (
-                MenuItemEntity item
-                in _tableClient.QueryAsync<MenuItemEntity>(
-                    x => x.PartitionKey == category))
+            try
             {
-                items.Add(item);
+                await foreach (
+                    MenuItemEntity item
+                    in _tableClient.QueryAsync<MenuItemEntity>(
+                        x => x.PartitionKey == category))
+                {
+                    items.Add(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not connect to storage for category filter. Returning empty list.");
             }
 
             HttpResponseData response =
@@ -320,6 +345,11 @@ public class MenuItemFunctions
         string category,
         string sku)
     {
+        if (!ValidateJwtRole(req, out var principal, "Admin", "Staff"))
+        {
+            return await Error(req, HttpStatusCode.Forbidden, "Access denied. Admin or Staff role required.");
+        }
+
         try
         {
             category = category.Trim();
@@ -425,6 +455,11 @@ public class MenuItemFunctions
         string category,
         string sku)
     {
+        if (!ValidateJwtRole(req, out var principal, "Admin", "Staff"))
+        {
+            return await Error(req, HttpStatusCode.Forbidden, "Access denied. Admin or Staff role required.");
+        }
+
         try
         {
             category = category.Trim();
@@ -466,6 +501,50 @@ public class MenuItemFunctions
                 req,
                 HttpStatusCode.InternalServerError,
                 ex.Message);
+        }
+    }
+
+
+    // ============================================================
+    // HELPER: JWT ROLE VALIDATION
+    // ============================================================
+
+    private bool ValidateJwtRole(HttpRequestData req, out ClaimsPrincipal? principal, params string[] allowedRoles)
+    {
+        principal = null;
+        if (!req.Headers.TryGetValues("Authorization", out var authHeaders))
+            return false;
+
+        var authHeader = authHeaders.FirstOrDefault();
+        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            return false;
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var keyStr = Environment.GetEnvironmentVariable("Jwt__Key") ?? "SuperSecretKeyWithAtLeast32BytesLengthHereForCoffeeNChillGateway";
+        var key = Encoding.UTF8.GetBytes(keyStr);
+
+        var handler = new JwtSecurityTokenHandler();
+        try
+        {
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = true,
+                ValidIssuer = Environment.GetEnvironmentVariable("Jwt__Issuer") ?? "CoffeeNChillAPI",
+                ValidateAudience = true,
+                ValidAudience = Environment.GetEnvironmentVariable("Jwt__Audience") ?? "CoffeeNChillClients",
+                ValidateLifetime = true
+            };
+
+            principal = handler.ValidateToken(token, validationParameters, out var validatedToken);
+            string userRole = principal.FindFirst(ClaimTypes.Role)?.Value ?? "";
+
+            return allowedRoles.Contains(userRole);
+        }
+        catch
+        {
+            return false;
         }
     }
 
