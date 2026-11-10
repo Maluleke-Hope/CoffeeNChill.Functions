@@ -1,57 +1,55 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 using Azure.Data.Tables;
 using CoffeeNChill.ApiGateway.Models;
 using CoffeeNChill.ApiGateway.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-// Storage & Services Dependency Injection
-var storageConn = builder.Configuration.GetConnectionString("AzureStorage")
-                  ?? "UseDevelopmentStorage=true";
-builder.Services.AddSingleton(new TableServiceClient(storageConn));
-builder.Services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
-builder.Services.AddScoped<IUserRegistrationService, UserRegistrationService>();
-builder.Services.AddScoped<IUserLoginService, UserLoginService>();
-builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-
-// JWT Authentication Configuration
-var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is missing.");
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+var host = Host.CreateDefaultBuilder(args)
+    .ConfigureFunctionsWebApplication()
+    .ConfigureServices((context, services) =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
-    });
+        var configuration = context.Configuration;
 
-builder.Services.AddAuthorization();
+        services.AddControllers();
+        services.AddEndpointsApiExplorer();
+        services.AddSwaggerGen();
 
-var app = builder.Build();
+        // Storage & Services Dependency Injection
+        var storageConn = configuration.GetConnectionString("AzureStorage")
+                          ?? "UseDevelopmentStorage=true";
+        services.AddSingleton(new TableServiceClient(storageConn));
+        services.AddScoped<IPasswordHasher<UserEntity>, PasswordHasher<UserEntity>>();
+        services.AddScoped<IUserRegistrationService, UserRegistrationService>();
+        services.AddScoped<IUserLoginService, UserLoginService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+        // JWT Authentication Configuration
+        var jwtKey = configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is missing.");
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = configuration["Jwt:Issuer"],
+                    ValidateAudience = true,
+                    ValidAudience = configuration["Jwt:Audience"],
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
 
-app.UseHttpsRedirection();
-app.UseAuthentication(); // Must be before UseAuthorization
-app.UseAuthorization();
-app.MapControllers();
+        services.AddAuthorization();
+    })
+    .Build();
 
-app.Run();
+host.Run();
