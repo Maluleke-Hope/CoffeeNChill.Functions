@@ -6,12 +6,19 @@ obj/
 .vs/
 *.user
 *.suo
+*.slnx
 
 # Visual Studio Code
 .vscode/
 
 # Azure Functions local settings
 local.settings.json
+appsettings.Development.json
+
+# Environment and Secrets
+.env
+*.key
+*.pem
 
 # Test results
 TestResults/
@@ -19,3 +26,9 @@ TestResults/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Old/Broken Docker files
+docker-compose.yml.yml
+compose.yml
+
+publish/

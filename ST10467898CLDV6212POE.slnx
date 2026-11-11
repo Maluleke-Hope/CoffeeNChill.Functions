@@ -1,3 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="CoffeeNChill.ApiGateway/CoffeeNChill.ApiGateway.csproj" Id="f7f54868-52ad-42d6-88c6-db7179aa6077" />
   <Project Path="ST10467898CLDV6212POE/ST10467898CLDV6212POE.csproj" />
 </Solution>
