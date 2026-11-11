@@ -1,0 +1,44 @@
+services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    volumes:
+      - azurite-data:/data
+    networks:
+      - coffeenchill-network
+
+  functions:
+    image: malulekehope/coffeenchill-functions:v3.0
+    environment:
+      - AzureWebJobsStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      - FUNCTIONS_WORKER_RUNTIME=dotnet-isolated
+    depends_on:
+      - azurite
+    networks:
+      - coffeenchill-network
+
+  gateway:
+    image: malulekehope/coffeenchill-gateway:v1.0
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AzureStorage=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      - Jwt__Key=SuperSecretKeyThatIsAtLeastThirtyTwoBytesLong!
+      - Jwt__Issuer=CoffeeNChill.ApiGateway
+      - Jwt__Audience=CoffeeNChill.Client
+      - FunctionsBaseUrl=http://functions:80
+    depends_on:
+      - functions
+    networks:
+      - coffeenchill-network
+
+networks:
+  coffeenchill-network:
+    driver: bridge
+
+volumes:
+  azurite-data:
