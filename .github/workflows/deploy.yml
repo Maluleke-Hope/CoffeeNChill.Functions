@@ -46,7 +46,8 @@ jobs:
       - name: Build and push Azure Functions
         uses: docker/build-push-action@v5
         with:
-          context: ./ST10467898CLDV6212POE
+          context: .
+          file: ./ST10467898CLDV6212POE/Dockerfile
           push: true
           tags: malulekehope/coffeenchill-functions:v3.0
 
