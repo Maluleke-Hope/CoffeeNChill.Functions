@@ -728,25 +728,25 @@ The remaining final submission activities include confirming the complete Docker
 
 # CoffeeNChill - Cloud Development POE Part 3
 
-## 🚀 Live Public URL
+## Live Public URL
 The application is hosted live and can be accessed at:
 **Swagger UI:** [INSERT YOUR NEW SERVEO URL HERE]/swagger
 
 *(Note: This URL is served via an SSH tunnel to the running Docker containers. The video demonstration shows the application running via `docker-compose up` and successfully handling requests).*
 
-## 🎥 Demonstration Video
+##  Demonstration Video
 **[Watch the full video presentation here](https://youtu.be/Zj5YGsrroDs)**
 
-## 📖 Project Overview
+## Project Overview
 CoffeeNChill is a Canteen Management System built for the Cloud Development module (CLDV6212). The application handles menu management, staff document uploads, and asynchronous order processing using a microservices architecture.
 
-## 🏗️ Architecture
+## Architecture
 1. **API Gateway (ASP.NET Core Web API):** Acts as the public entry point. It handles JWT authentication, password hashing (BCrypt), and Role-Based Access Control (RBAC). It routes authorized requests to the backend Azure Functions.
 2. **Azure Functions (.NET 8 Isolated):** Handles backend business logic including Menu Management, Document Uploads, and Order Queuing.
 3. **Azurite (Azure Storage Emulator):** Emulates Azure Tables (Users, Orders), Queues (`order-processing-queue`), and Blobs locally.
 4. **Docker Compose:** Orchestrates all three services into a custom bridge network (`coffeenchill-network`), ensuring they can communicate internally while exposing only the Gateway to the host.
 
-## 🛠️ Technologies Used
+## Technologies Used
 * C# / .NET 8
 * ASP.NET Core Web API
 * Azure Functions (Isolated Worker)
@@ -756,7 +756,7 @@ CoffeeNChill is a Canteen Management System built for the Cloud Development modu
 * Swagger / OpenAPI
 * GitHub Actions (CI/CD)
 
-## 💻 Setup Instructions (Local)
+## Setup Instructions (Local)
 1. Clone the repository.
 2. Ensure Docker Desktop is running.
 3. Run the following command in the root directory:
